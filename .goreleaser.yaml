@@ -1,0 +1,33 @@
+project_name: incase
+release:
+  prerelease: auto # don't publish release with -rc1,-pre, etc suffixes
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - env: [CGO_ENABLED=0]
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    main: ./main.go
+    ldflags:
+      - -s -w
+    binary: "incase"
+archives:
+  - replacements:
+      darwin: macOS
+    files:
+      - README.md
+      - LICENSE
+snapshot:
+  name_template: "{{ .Tag }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - Merge pull request
