@@ -3,7 +3,7 @@ spec:
   services:
     - name: web
       git:
-        branch: main
+        branch: master
         repo_clone_url: https://github.com/thesoulless/incase.git
       envs:
         - key: DEV
