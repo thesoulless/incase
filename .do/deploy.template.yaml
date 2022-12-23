@@ -7,13 +7,13 @@ spec:
         repo_clone_url: git@github.com:thesoulless/incase.git
       envs:
         - key: DEV
-          value: false
+          value: "false"
           scope: RUN_TIME
         - key: HOST
           value: "0.0.0.0"
           scope: RUN_TIME
         - key: PORT
-          value: 80
+          value: "80"
           scope: RUN_TIME
         - key: EMAIL
           scope: RUN_TIME
@@ -23,7 +23,3 @@ spec:
           scope: RUN_TIME
         - key: CERT
           scope: RUN_TIME
-        - key: DATABASE_URL
-          scope: RUN_TIME
-          value: ${example-db.DATABASE_URL}
-          type: SECRET
