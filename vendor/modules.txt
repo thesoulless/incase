@@ -1,7 +1,7 @@
 # github.com/caddyserver/certmagic v0.20.0
 ## explicit; go 1.19
 github.com/caddyserver/certmagic
-# github.com/go-chi/chi/v5 v5.0.8
+# github.com/go-chi/chi/v5 v5.0.12
 ## explicit; go 1.14
 github.com/go-chi/chi/v5
 # github.com/klauspost/cpuid/v2 v2.2.5
