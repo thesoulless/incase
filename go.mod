@@ -1,6 +1,6 @@
 module github.com/thesoulless/incase
 
-go 1.19
+go 1.22
 
 require (
 	github.com/caddyserver/certmagic v0.20.0
