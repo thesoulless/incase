@@ -1,4 +1,4 @@
-# github.com/caddyserver/certmagic v0.21.2
+# github.com/caddyserver/certmagic v0.21.3
 ## explicit; go 1.21.0
 github.com/caddyserver/certmagic
 # github.com/caddyserver/zerossl v0.1.3
