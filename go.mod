@@ -4,7 +4,7 @@ go 1.22
 
 require (
 	github.com/caddyserver/certmagic v0.21.3
-	github.com/go-chi/chi/v5 v5.0.12
+	github.com/go-chi/chi/v5 v5.0.14
 	github.com/rs/xid v1.5.0
 	golang.org/x/exp v0.0.0-20221217163422-3c43f8badb15
 )
