@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"embed"
 	"encoding/gob"
@@ -103,20 +104,34 @@ func setupServer(mux http.Handler) (*http.Server, error) {
 		MaxHeaderBytes:    1 << 12,
 	}
 
-	if !dev && cert == "" && certKey == "" {
+	if cert == "" && certKey == "" {
 		domains := strings.Split(domain, ",")
-		tlsConfig, err := certmagic.TLS(domains)
-		if err != nil {
-			slog.Error("certmagic.TLS", err)
-			os.Exit(1)
+
+		ca := certmagic.LetsEncryptStagingCA
+
+		if !dev {
+			ca = certmagic.LetsEncryptProductionCA
 		}
 
 		magic := certmagic.NewDefault()
 		issuer := certmagic.NewACMEIssuer(magic, certmagic.ACMEIssuer{
-			CA:     certmagic.LetsEncryptStagingCA,
+			CA:     ca,
 			Email:  email,
 			Agreed: true,
 		})
+		magic.Issuers = []certmagic.Issuer{issuer}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		err := magic.ManageSync(ctx, domains)
+		if err != nil {
+			return nil, fmt.Errorf("magic.ManageSync: %w", err)
+		}
+
+		tlsConfig := magic.TLSConfig()
+
+		tlsConfig.NextProtos = append([]string{"h2", "http/1.1"}, tlsConfig.NextProtos...)
 
 		srv.Handler = issuer.HTTPChallengeHandler(mux)
 		srv.TLSConfig = tlsConfig
