@@ -2,9 +2,11 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"embed"
 	"encoding/gob"
+	"errors"
 	"flag"
 	"fmt"
 	"html/template"
@@ -14,9 +16,10 @@ import (
 	"strings"
 	"time"
 
+	"log/slog"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/xid"
-	"golang.org/x/exp/slog"
 )
 
 var (
@@ -65,13 +68,22 @@ func run() error {
 			slog.Info("server starting", "path", fmt.Sprintf("http://%s:%s", host, port))
 		}
 
-		_ = srv.ListenAndServe()
+		err = srv.ListenAndServe()
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.Error("failed to run server", "error", err)
+		}
 	}()
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt)
 
 	<-sigCh
+
+	slog.Info("shutting down the server...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+	srv.Shutdown(ctx)
 
 	return nil
 }
