@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"crypto/tls"
 	"embed"
 	"encoding/gob"
@@ -15,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/caddyserver/certmagic"
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/xid"
 	"golang.org/x/exp/slog"
@@ -102,39 +100,6 @@ func setupServer(mux http.Handler) (*http.Server, error) {
 		ReadHeaderTimeout: time.Second * 30,
 		WriteTimeout:      time.Second * 30,
 		MaxHeaderBytes:    1 << 12,
-	}
-
-	if cert == "" && certKey == "" {
-		domains := strings.Split(domain, ",")
-
-		ca := certmagic.LetsEncryptStagingCA
-
-		if !dev {
-			ca = certmagic.LetsEncryptProductionCA
-		}
-
-		magic := certmagic.NewDefault()
-		issuer := certmagic.NewACMEIssuer(magic, certmagic.ACMEIssuer{
-			CA:     ca,
-			Email:  email,
-			Agreed: true,
-		})
-		magic.Issuers = []certmagic.Issuer{issuer}
-
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-
-		err := magic.ManageSync(ctx, domains)
-		if err != nil {
-			return nil, fmt.Errorf("magic.ManageSync: %w", err)
-		}
-
-		tlsConfig := magic.TLSConfig()
-
-		tlsConfig.NextProtos = append([]string{"h2", "http/1.1"}, tlsConfig.NextProtos...)
-
-		srv.Handler = issuer.HTTPChallengeHandler(mux)
-		srv.TLSConfig = tlsConfig
 	}
 
 	if cert != "" && certKey != "" {
