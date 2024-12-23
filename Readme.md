@@ -2,8 +2,6 @@
 InCase save your secrets for a friend, so they can use in case
 it in case you went "missing".
 
-[![Deploy to DO](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/thesoulless/incase/tree/master)
-
 ## How it works
 It encodes your provided note with your given password using AES (Rijndael) and returns
 a targetURL. The key argument should be the AES key, either 16, 24, or 32 bytes to 
