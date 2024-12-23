@@ -16,11 +16,5 @@ InCase intentionally does not log anything about your key/data.
 Everytime I'm going on a long trip, long flight, cruise, etc. I share
 some of my passwords with a close friend, in case I die or went missing.
 
-You may ask why a dead man should care about his accounts? In my case there
-are some people who (to some extent) depend on me to sorting some of their digital
-stuff around.
-
 From another view point, maybe some day my friend/family would be able to ~~replicate~~
 mimic "me" with all data there is and can have a chat with me.
-
-> Ray Kurzweil entered the chat...
