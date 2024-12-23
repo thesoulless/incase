@@ -27,7 +27,6 @@ var (
 	dev                                      bool
 	indexPage, deletePage                    []byte
 	decPageTmpl                              *template.Template
-	err                                      error
 
 	visitFile *os.File
 	visits    = make(map[string]int)
@@ -41,17 +40,18 @@ const (
 var tmpl embed.FS
 
 func main() {
-	if err = run(); err != nil {
+	if err := run(); err != nil {
 		os.Exit(1)
 	}
 }
 
 func run() error {
+	slog.Info("starting the application...")
 	setupFlags()
 
 	loadVisitCounts()
 
-	visitFile, err = os.OpenFile("counts.gob", os.O_RDWR|os.O_CREATE, 0600)
+	visitFile, err := os.OpenFile("counts.gob", os.O_RDWR|os.O_CREATE, 0600)
 	defer visitFile.Close()
 
 	loadHTMLTemplates()
@@ -91,6 +91,7 @@ func run() error {
 func loadVisitCounts() {
 	countVals, err := os.ReadFile("counts.gob")
 	if err != nil {
+		slog.Info("failed to read visit counts")
 		return
 	}
 
@@ -98,7 +99,7 @@ func loadVisitCounts() {
 }
 
 func saveCounts(v map[string]int) {
-	err = gob.NewEncoder(visitFile).Encode(v)
+	err := gob.NewEncoder(visitFile).Encode(v)
 	if err != nil {
 		slog.Error("gob.NewEncoder", err)
 	}
@@ -276,6 +277,7 @@ func incVisit(file string) {
 }
 
 func loadHTMLTemplates() {
+	var err error
 	indexPage, err = tmpl.ReadFile("templates/index.html")
 	if err != nil {
 		slog.Error("tmpl.ReadFile", err)
@@ -311,6 +313,7 @@ func setupFlags() {
 	flag.StringVar(&cert, "cert", "", "certificate file")
 	flag.Parse()
 
+	var err error
 	flag.VisitAll(func(f *flag.Flag) {
 		name := strings.ToUpper(strings.Replace(f.Name, "-", "_", -1))
 		if value, ok := os.LookupEnv(name); ok {
@@ -320,6 +323,10 @@ func setupFlags() {
 			}
 		}
 	})
+
+	if err != nil {
+		slog.Error("failed to load envs", "error", err)
+	}
 
 	if domain == "" {
 		domain = host
