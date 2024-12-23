@@ -12,6 +12,7 @@ primary_region = 'ams'
 
 [env]
   PORT = '8080'
+  HOST = '127.0.0.1'
 
 [http_service]
   internal_port = 80
