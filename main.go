@@ -1,11 +1,12 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
+	"database/sql"
 	"embed"
 	"encoding/gob"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -20,6 +21,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/xid"
+
+	_ "github.com/jackc/pgx/v4/stdlib"
+	"github.com/jmoiron/sqlx"
 )
 
 var (
@@ -27,20 +31,36 @@ var (
 	dev                                      bool
 	indexPage, deletePage                    []byte
 	decPageTmpl                              *template.Template
+	db                                       *sqlx.DB
 
 	visitFile *os.File
 	visits    = make(map[string]int)
+
+	//go:embed templates/*
+	tmpl embed.FS
+
+	// id content openned created_at updated_at
+	schema = `CREATE TABLE IF NOT EXISTS files (
+		id			varchar(255) PRIMARY KEY,
+		content		bytea,
+		openned		integer DEFAULT 0,
+		created_at	timestamp with time zone,
+		updated_at	timestamp with time zone
+	);`
 )
 
 const (
 	ext = ".inc"
 )
 
-//go:embed templates/*
-var tmpl embed.FS
+type RespError struct {
+	Status bool
+	Error  string
+}
 
 func main() {
 	if err := run(); err != nil {
+		slog.Error("failed to run the application", "error", err)
 		os.Exit(1)
 	}
 }
@@ -49,9 +69,30 @@ func run() error {
 	slog.Info("starting the application...")
 	setupFlags()
 
-	loadVisitCounts()
+	var err error
+	db, err = sqlx.Open("pgx", os.Getenv("DATABASE_URL"))
+	if err != nil {
+		slog.Error("failed connect to the db", "error", err)
+		os.Exit(1)
+	}
+	defer db.Close()
 
-	visitFile, err := os.OpenFile("counts.gob", os.O_RDWR|os.O_CREATE, 0600)
+	err = db.Ping()
+	if err != nil {
+		return fmt.Errorf("failed to ping the db: %w", err)
+	}
+
+	db.MustExec(schema)
+
+	err = loadVisitCounts()
+	if err != nil {
+		return fmt.Errorf("failed to load openned: %w", err)
+	}
+
+	visitFile, err = os.OpenFile("counts.gob", os.O_RDWR|os.O_CREATE, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to open the visit file: %w", err)
+	}
 	defer visitFile.Close()
 
 	loadHTMLTemplates()
@@ -88,20 +129,28 @@ func run() error {
 	return nil
 }
 
-func loadVisitCounts() {
-	countVals, err := os.ReadFile("counts.gob")
+func loadVisitCounts() error {
+	res := []struct {
+		ID      string
+		Openned int
+	}{}
+
+	err := db.Select(&res, "SELECT id, openned FROM files")
 	if err != nil {
-		slog.Info("failed to read visit counts")
-		return
+		return err
 	}
 
-	gob.NewDecoder(bytes.NewReader(countVals)).Decode(&visits)
+	for _, v := range res {
+		visits[v.ID] = v.Openned
+	}
+
+	return nil
 }
 
 func saveCounts(v map[string]int) {
 	err := gob.NewEncoder(visitFile).Encode(v)
 	if err != nil {
-		slog.Error("gob.NewEncoder", err)
+		slog.Error("gob.NewEncoder", "error", err)
 	}
 }
 
@@ -175,15 +224,17 @@ func newRouter() http.Handler {
 
 		name := xid.New().String()
 
-		err = os.WriteFile(name+ext, encd, 0600)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+		ctx, cancel := context.WithTimeout(context.TODO(), time.Second*5)
+		defer cancel()
 
-		link := fmt.Sprintf("http://%s:%s/%s.txt", host, port, name)
+		db.NamedExecContext(ctx, `INSERT INTO files (id, content, created_at) VALUES (:id, :content, NOW())`, map[string]interface{}{
+			"id":      name,
+			"content": encd,
+		})
+
+		link := fmt.Sprintf("http://%s:%s/%s.txt", domain, port, name)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(fmt.Sprintf(`<a href="%s">%s</a>`, link, link)))
+		fmt.Fprintf(w, `<a href="%s">%s</a>`, link, link)
 	})
 
 	mux.Get("/{file}.txt", func(w http.ResponseWriter, r *http.Request) {
@@ -212,20 +263,34 @@ func newRouter() http.Handler {
 		pass := r.PostFormValue("password")
 		file := chi.URLParam(r, "file")
 
-		content, err := os.ReadFile(file + ext)
+		var content []byte
+		err := db.Get(&content, "SELECT content FROM files WHERE id=$1", file)
 		if err != nil {
-			// don't return 404 even if it's a fs.PathError
-			w.Header().Set("Content-Type", "application/json")
+			if !errors.Is(err, sql.ErrNoRows) {
+				slog.Error("failed to db.Get", "error", err)
+			}
+			// don't return 404
 			http.Error(w, `{"message": "something went wrong "}`, http.StatusInternalServerError)
 			return
 		}
+
 		res, err := DecryptAES([]byte(pass), content)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		incVisit(file)
+		err = incVisit(file)
+		if err != nil {
+			slog.Error("failed to incVisit", "error", err)
+			w.Header().Set("Content-Type", "application/json")
+			e := RespError{Error: err.Error()}
+			err = json.NewEncoder(w).Encode(e)
+			if err != nil {
+				slog.Error("failed to write the response on incVisit failure", "error", err)
+			}
+			return
+		}
 
 		w.Header().Set("Content-Type", "text/html")
 		w.WriteHeader(http.StatusOK)
@@ -241,9 +306,10 @@ func newRouter() http.Handler {
 		pass := r.PostFormValue("password")
 		file := chi.URLParam(r, "file")
 
-		content, err := os.ReadFile(file + ext)
+		var content []byte
+		err := db.Get(&content, "SELECT content FROM files WHERE id=$1", file)
 		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
+			slog.Error("failed to db.Get", "error", err)
 			http.Error(w, `{"message": "something went wrong "}`, http.StatusInternalServerError)
 			return
 		}
@@ -255,12 +321,18 @@ func newRouter() http.Handler {
 		}
 
 		// key is valid
-		// delete the file
-		err = os.Remove(file + ext)
+		// delete the row
+		ctx, cancel := context.WithTimeout(context.TODO(), time.Second*5)
+		defer cancel()
+
+		_, err = db.ExecContext(ctx, "DELETE FROM files WHERE id=$1", file)
 		if err != nil {
+			slog.Error("failed to db.ExecContext", "error", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		delete(visits, file)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -270,10 +342,21 @@ func newRouter() http.Handler {
 	return mux
 }
 
-func incVisit(file string) {
+func incVisit(file string) error {
+	// inc db visits
+	ctx, cancel := context.WithTimeout(context.TODO(), time.Second*5)
+	defer cancel()
+
+	_, err := db.NamedExecContext(ctx, `UPDATE files SET openned=openned+1 WHERE id=:id`, map[string]interface{}{
+		"id": file,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to increase the openned count: %w", err)
+	}
+
 	visits[file] += 1
 
-	saveCounts(visits)
+	return nil
 }
 
 func loadHTMLTemplates() {
@@ -308,7 +391,7 @@ func setupFlags() {
 	flag.StringVar(&host, "host", "localhost", "host to run the server")
 	flag.StringVar(&port, "port", "80", "port to run the server")
 	flag.StringVar(&email, "email", "", "email to be used by autocert")
-	flag.StringVar(&domain, "domain", "", "domain to be used by autocert. If empty, the value for host will be used")
+	flag.StringVar(&domain, "domain", "", "domain to be used for url generation")
 	flag.StringVar(&certKey, "cert-key", "", "certificate key file")
 	flag.StringVar(&cert, "cert", "", "certificate file")
 	flag.Parse()
