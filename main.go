@@ -27,11 +27,11 @@ import (
 )
 
 var (
-	host, port, email, domain, certKey, cert string
-	dev                                      bool
-	indexPage, deletePage                    []byte
-	decPageTmpl                              *template.Template
-	db                                       *sqlx.DB
+	host, port, email, domain, certKey, cert, database_url string
+	dev                                                    bool
+	indexPage, deletePage                                  []byte
+	decPageTmpl                                            *template.Template
+	db                                                     *sqlx.DB
 
 	visitFile *os.File
 	visits    = make(map[string]int)
@@ -70,7 +70,7 @@ func run() error {
 	setupFlags()
 
 	var err error
-	db, err = sqlx.Open("pgx", os.Getenv("DATABASE_URL"))
+	db, err = sqlx.Open("pgx", database_url)
 	if err != nil {
 		slog.Error("failed connect to the db", "error", err)
 		os.Exit(1)
@@ -402,6 +402,7 @@ func setupFlags() {
 	flag.StringVar(&port, "port", "80", "port to run the server")
 	flag.StringVar(&email, "email", "", "email to be used by autocert")
 	flag.StringVar(&domain, "domain", "http://127.0.0.1", "domain with schema (and port if needed) to be used for url generation")
+	flag.StringVar(&database_url, "database-url", "", "database url")
 	flag.StringVar(&certKey, "cert-key", "", "certificate key file")
 	flag.StringVar(&cert, "cert", "", "certificate file")
 	flag.Parse()
