@@ -232,7 +232,7 @@ func newRouter() http.Handler {
 			"content": encd,
 		})
 
-		link := fmt.Sprintf("%s:%s/%s.txt", domain, port, name)
+		link := fmt.Sprintf("%s/%s.txt", domain, name)
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, `<a href="%s">%s</a>`, link, link)
 	})
@@ -401,7 +401,7 @@ func setupFlags() {
 	flag.StringVar(&host, "host", "localhost", "host to run the server")
 	flag.StringVar(&port, "port", "80", "port to run the server")
 	flag.StringVar(&email, "email", "", "email to be used by autocert")
-	flag.StringVar(&domain, "domain", "http://127.0.0.1", "domain with schema to be used for url generation")
+	flag.StringVar(&domain, "domain", "http://127.0.0.1", "domain with schema (and port if needed) to be used for url generation")
 	flag.StringVar(&certKey, "cert-key", "", "certificate key file")
 	flag.StringVar(&cert, "cert", "", "certificate file")
 	flag.Parse()
@@ -422,6 +422,6 @@ func setupFlags() {
 	}
 
 	if domain == "" {
-		domain = host
+		domain = fmt.Sprintf("http://%s:%s", host, port)
 	}
 }
