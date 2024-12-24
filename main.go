@@ -270,13 +270,18 @@ func newRouter() http.Handler {
 				slog.Error("failed to db.Get", "error", err)
 			}
 			// don't return 404
-			http.Error(w, `{"message": "something went wrong "}`, http.StatusInternalServerError)
+			http.Error(w, `{"message": "something went wrong"}`, http.StatusInternalServerError)
 			return
 		}
 
 		res, err := DecryptAES([]byte(pass), content)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			w.Header().Set("Content-Type", "application/json")
+			res := RespError{Error: err.Error()}
+			err = json.NewEncoder(w).Encode(res)
+			if err != nil {
+				slog.Error("failed to write the response on decryption failure", "error", err)
+			}
 			return
 		}
 
@@ -310,13 +315,18 @@ func newRouter() http.Handler {
 		err := db.Get(&content, "SELECT content FROM files WHERE id=$1", file)
 		if err != nil {
 			slog.Error("failed to db.Get", "error", err)
-			http.Error(w, `{"message": "something went wrong "}`, http.StatusInternalServerError)
+			http.Error(w, `{"message": "something went wrong"}`, http.StatusInternalServerError)
 			return
 		}
 
 		_, err = DecryptAES([]byte(pass), content)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			w.Header().Set("Content-Type", "application/json")
+			res := RespError{Error: err.Error()}
+			err = json.NewEncoder(w).Encode(res)
+			if err != nil {
+				slog.Error("failed to write the response on decryption failure", "error", err)
+			}
 			return
 		}
 
