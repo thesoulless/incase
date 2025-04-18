@@ -11,13 +11,12 @@ import (
 	"flag"
 	"fmt"
 	"html/template"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"strings"
 	"time"
-
-	"log/slog"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/xid"
@@ -89,7 +88,7 @@ func run() error {
 		return fmt.Errorf("failed to load openned: %w", err)
 	}
 
-	visitFile, err = os.OpenFile("counts.gob", os.O_RDWR|os.O_CREATE, 0600)
+	visitFile, err = os.OpenFile("counts.gob", os.O_RDWR|os.O_CREATE, 0o600)
 	if err != nil {
 		return fmt.Errorf("failed to open the visit file: %w", err)
 	}
@@ -167,7 +166,7 @@ func setupServer(mux http.Handler) (*http.Server, error) {
 	if cert != "" && certKey != "" {
 		cer, err := tls.LoadX509KeyPair(cert, certKey)
 		if err != nil {
-			slog.Error("tls.LoadX509KeyPair", err)
+			slog.Error("tls.LoadX509KeyPair", "error", err)
 			return nil, err
 		}
 
@@ -255,7 +254,7 @@ func newRouter() http.Handler {
 			BasePath: r.RequestURI,
 		}
 		decPageTmpl.Execute(w, data)
-		//w.Write(decPage)
+		// w.Write(decPage)
 	})
 
 	mux.Post("/{file}.txt", func(w http.ResponseWriter, r *http.Request) {
@@ -373,25 +372,25 @@ func loadHTMLTemplates() {
 	var err error
 	indexPage, err = tmpl.ReadFile("templates/index.html")
 	if err != nil {
-		slog.Error("tmpl.ReadFile", err)
+		slog.Error("tmpl.ReadFile", "error", err)
 		os.Exit(1)
 	}
 
 	decPage, err := tmpl.ReadFile("templates/decrypt.html")
 	if err != nil {
-		slog.Error("tmpl.ReadFile", err)
+		slog.Error("tmpl.ReadFile", "error", err)
 		os.Exit(1)
 	}
 
 	decPageTmpl, err = template.New("decrypt").Parse(string(decPage))
 	if err != nil {
-		slog.Error("template.New", err)
+		slog.Error("template.New", "error", err)
 		os.Exit(1)
 	}
 
 	deletePage, err = tmpl.ReadFile("templates/delete.html")
 	if err != nil {
-		slog.Error("tmpl.ReadFile", err)
+		slog.Error("tmpl.ReadFile", "error", err)
 		os.Exit(1)
 	}
 }
