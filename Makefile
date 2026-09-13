@@ -20,12 +20,12 @@ fuzz:
 fly-create:
 	fly apps create $(FLY_APP) --machines
 
-## Create and attach Postgres
+## Create Managed Postgres and attach to app
 fly-db:
-	fly postgres create --name $(FLY_DB) --region $(FLY_REGION)
+	fly mpg create --name $(FLY_DB) --region $(FLY_REGION)
 
 fly-attach:
-	fly postgres attach $(FLY_DB) --app $(FLY_APP)
+	fly mpg attach $(FLY_DB) -a $(FLY_APP)
 
 ## Deploy the app
 fly-deploy:
@@ -37,7 +37,7 @@ fly-up: fly-create fly-db fly-attach fly-deploy
 ## Tear everything down
 fly-down:
 	-fly apps destroy $(FLY_APP) --yes
-	-fly apps destroy $(FLY_DB) --yes
+	-fly mpg destroy $(FLY_DB) --yes
 
 ## Helpers
 fly-status:
